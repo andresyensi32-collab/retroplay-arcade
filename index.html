@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RetroPlay Arcade Hub - CrossPlatform Native Edition</title>
+    <!-- PWA & Native App Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@300;400;600;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            background-color: #090d16;
+            color: #f8fafc;
+        }
+        
+        .font-arcade {
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        /* CRT Shader Overlay Effect */
+        .crt-shader::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            z-index: 10;
+            background-size: 100% 3px, 6px 100%;
+            pointer-events: none;
+        }
+
+        /* Touch Control Custom Buttons */
+        .dpad-btn {
+            background: radial-gradient(circle, #334155 0%, #1e293b 100%);
+            box-shadow: 0 4px 0 #0f172a, inset 0 1px 1px rgba(255,255,255,0.2);
+        }
+        .dpad-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #0f172a;
+        }
+
+        /* Playstation Buttons Colors */
+        .ps-btn-cross { background: #2563eb; color: white; }
+        .ps-btn-circle { background: #dc2626; color: white; }
+        .ps-btn-square { background: #db2777; color: white; }
+        .ps-btn-triangle { background: #059669; color: white; }
+
+        /* Wii Controller Theme */
+        .wii-btn { background: #e2e8f0; color: #0f172a; border: 2px solid #cbd5e1; font-weight: bold; }
+        .wii-btn:active { background: #94a3b8; }
+        
+        .action-btn {
+            box-shadow: 0 4px 0 rgba(0,0,0,0.5), inset 0 2px 2px rgba(255,255,255,0.4);
+        }
+        .action-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.5);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 px-4 py-3 shadow-lg">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-gamepad text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-sm sm:text-base text-white tracking-wide">RetroPlay Arcade</h1>
+                    <p class="text-[10px] text-slate-400">Hub Universal ISO & Retro Engine</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button id="pwa-install-btn" class="hidden text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold transition items-center gap-1.5">
+                    <i class="fa-solid fa-download"></i>
+                    <span class="hidden sm:inline">Instalar App</span>
+                </button>
+                <button onclick="toggleFullscreen()" class="p-2 text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition flex items-center gap-1 font-bold text-xs" title="Pantalla Completa">
+                    <i class="fa-solid fa-expand text-sm"></i>
+                    <span class="hidden md:inline">Pantalla Completa</span>
+                </button>
+                <label for="top-rom-input" class="cursor-pointer bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <span>+ Cargar Juego (ISO)</span>
+                </label>
+                <input type="file" id="top-rom-input" accept=".iso,.wbfs,.chd,.bin,.gba,.smc,.nes,.z64,.n64" class="hidden">
+            </div>
+        </div>
+    </header>
+
+    <!-- Simple Step Guide Banner for Easy Understanding -->
+    <div class="bg-slate-900/90 border-b border-slate-800/80 py-2.5 px-4 text-center backdrop-blur">
+        <div class="max-w-4xl mx-auto grid grid-cols-3 gap-2 text-xs md:text-sm">
+            <div class="flex items-center justify-center gap-2 text-indigo-400 font-bold bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
+                <span class="bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">1</span>
+                <span>Descarga tu ISO</span>
+            </div>
+            <div class="flex items-center justify-center gap-2 text-emerald-400 font-bold bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
+                <span class="bg-emerald-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">2</span>
+                <span>Cárgala en la App</span>
+            </div>
+            <div class="flex items-center justify-center gap-2 text-amber-400 font-bold bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
+                <span class="bg-amber-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">3</span>
+                <span>¡Juega en Pantalla Completa!</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col gap-6">
+
+        <!-- Main Game Viewport Screen -->
+        <div id="game-container" class="relative w-full aspect-video bg-black rounded-2xl overflow-hidden border-2 border-slate-800 shadow-2xl flex flex-col items-center justify-center">
+            
+            <!-- Active Controller Type Badge -->
+            <div id="controller-badge" class="absolute top-3 left-3 z-20 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-slate-300 border border-slate-700 flex items-center gap-2">
+                <i class="fa-solid fa-gamepad text-indigo-400"></i>
+                <span id="controller-name-text">Mando PS2 / Universal</span>
+            </div>
+
+            <!-- Fullscreen Quick Overlay Button -->
+            <button onclick="toggleFullscreen()" class="absolute top-3 right-3 z-20 bg-indigo-600/90 hover:bg-indigo-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg backdrop-blur transition flex items-center gap-1.5">
+                <i class="fa-solid fa-expand"></i> Pantalla Completa
+            </button>
+
+            <!-- Dynamic Touch Controls Overlay Adaptable by Console (PS2, Wii, Nintendo) -->
+            <div id="touch-controls" class="absolute inset-x-0 bottom-2 z-20 p-4 flex justify-between items-end pointer-events-none">
+                
+                <!-- D-PAD / Cruceta Directional (Universal) -->
+                <div class="pointer-events-auto grid grid-cols-3 gap-1 w-32 h-32 p-1 bg-slate-950/40 rounded-full backdrop-blur-sm border border-slate-800">
+                    <div></div>
+                    <button ontouchstart="keyMap['ArrowUp']=true" ontouchend="delete keyMap['ArrowUp']" class="text-white font-bold rounded-t-lg dpad-btn active:scale-90 flex items-center justify-center">▲</button>
+                    <div></div>
+                    <button ontouchstart="keyMap['ArrowLeft']=true" ontouchend="delete keyMap['ArrowLeft']" class="text-white font-bold rounded-l-lg dpad-btn active:scale-90 flex items-center justify-center">◄</button>
+                    <div class="bg-slate-900/80 rounded-sm"></div>
+                    <button ontouchstart="keyMap['ArrowRight']=true" ontouchend="delete keyMap['ArrowRight']" class="text-white font-bold rounded-r-lg dpad-btn active:scale-90 flex items-center justify-center">►</button>
+                    <div></div>
+                    <button ontouchstart="keyMap['ArrowDown']=true" ontouchend="delete keyMap['ArrowDown']" class="text-white font-bold rounded-b-lg dpad-btn active:scale-90 flex items-center justify-center">▼</button>
+                    <div></div>
+                </div>
+
+                <!-- Center Start / Select Buttons -->
+                <div class="pointer-events-auto flex gap-2 mb-2 bg-slate-950/60 p-2 rounded-xl backdrop-blur-sm border border-slate-800">
+                    <button ontouchstart="keyMap['ShiftRight']=true" ontouchend="delete keyMap['ShiftRight']" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white text-xs font-mono rounded shadow active:scale-95">SELECT</button>
+                    <button ontouchstart="keyMap['Enter']=true" ontouchend="delete keyMap['Enter']" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-mono font-bold rounded shadow active:scale-95">START</button>
+                </div>
+
+                <!-- Dynamic Right Action Buttons (Swaps layout based on PS2, Wii, Nintendo) -->
+                <div id="action-buttons-container" class="pointer-events-auto">
+                    <!-- Rendered by JS dynamically -->
+                </div>
+
+            </div>
+
+            <!-- Idle / Upload Call To Action Overlay -->
+            <div id="idle-screen" class="absolute inset-0 z-10 bg-slate-950 flex flex-col items-center justify-center p-6 text-center gap-4">
+                <div class="w-20 h-20 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-indigo-400 text-3xl shadow-inner animate-pulse">
+                    <i class="fa-solid fa-compact-disc"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-bold text-white mb-1">Sin Juego Activo</h2>
+                    <p class="text-xs text-slate-400 max-w-md">Selecciona un archivo <b>.ISO, .WBFS, .GBA o .SMC</b> de tu teléfono o elige un juego del catálogo inferior para comenzar inmediatamente.</p>
+                </div>
+                <label for="main-rom-input" class="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-600/30 flex items-center gap-2">
+                    <i class="fa-solid fa-file-arrow-up text-sm"></i>
+                    <span>Cargar Juego desde Archivo ISO</span>
+                </label>
+                <input type="file" id="main-rom-input" accept=".iso,.wbfs,.chd,.bin,.gba,.smc,.nes,.z64,.n64" class="hidden">
+            </div>
+
+            <!-- Loader Spinner -->
+            <div id="loader" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center gap-3">
+                <div class="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+                <p id="loader-text" class="text-xs font-mono text-indigo-300 animate-pulse">Analizando estructura de ISO...</p>
+            </div>
+
+            <!-- Canvas Display Render -->
+            <div id="canvas-wrapper" class="relative w-full h-full flex items-center justify-center crt-shader">
+                <canvas id="emulator-canvas" class="max-w-full max-h-full aspect-video bg-black rounded shadow-2xl object-contain"></canvas>
+            </div>
+        </div>
+
+        <!-- System Selectors & Local Library Header -->
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+            <div>
+                <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-indigo-400"></i>
+                    Catálogo & Biblioteca Local
+                </h3>
+                <p class="text-xs text-slate-400">Juegos listos y ROMs agregadas recientemente</p>
+            </div>
+            
+            <div class="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0" id="systems-filter">
+                <!-- Systems generated by JS -->
+            </div>
+        </div>
+
+        <!-- Games Grid -->
+        <div id="games-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <!-- Dynamic Cards Loaded by JS -->
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 border-t border-slate-800 py-4 px-6 text-center text-xs text-slate-500 mt-8">
+        <p>RetroPlay Arcade Hub Native PWA • Compatible con Android, iOS y PC.</p>
+    </footer>
+
+    <!-- Universal Logic Script Engine -->
+    <script>
+        const keyMap = {};
+
+        // Canvas setup
+        const canvas = document.getElementById('emulator-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 640;
+        canvas.height = 480;
+
+        // Player Demo State
+        let player = { x: 50, y: 380, vy: 0, grounded: true };
+        let coins = [{x: 200, y: 320}, {x: 300, y: 300}, {x: 400, y: 280}];
+        let score = 0;
+
+        // Demo Games Catalogue
+        const sampleGames = [
+            { id: 'nsmb-wii', title: 'Newer Super Mario Bros', systemName: 'Wii', color: '#dc2626', icon: 'fa-gamepad' },
+            { id: 'god-of-war-2', title: 'God of War II', systemName: 'PS2', color: '#2563eb', icon: 'fa-shield-halved' },
+            { id: 'pokemon-emerald', title: 'Pokémon Emerald', systemName: 'GBA', color: '#059669', icon: 'fa-bolt' },
+            { id: 'mario-64', title: 'Super Mario 64', systemName: 'N64', color: '#d97706', icon: 'fa-cube' },
+            { id: 'zelda-snes', title: 'Zelda A Link to the Past', systemName: 'SNES', color: '#7c3aed', icon: 'fa-wand-magic-sparkles' }
+        ];
+
+        let userLoadedGames = [];
+        let currentGame = null;
+        let isPlaying = false;
+        let pwaDeferredPrompt = null;
+
+        // Service Worker / PWA Register Hook
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            pwaDeferredPrompt = e;
+            const btn = document.getElementById('pwa-install-btn');
+            if(btn) {
+                btn.classList.remove('hidden');
+                btn.classList.add('flex');
+                btn.onclick = () => {
+                    pwaDeferredPrompt.prompt();
+                    pwaDeferredPrompt.userChoice.then(() => {
+                        btn.classList.add('hidden');
+                    });
+                };
+            }
+        });
+
+        // Controller Renderer by System Type (PlayStation 2, Wii, Nintendo)
+        function updateControllerLayout(systemName) {
+            const container = document.getElementById('action-buttons-container');
+            const badgeText = document.getElementById('controller-name-text');
+            if(!container) return;
+
+            const sys = (systemName || '').toLowerCase();
+
+            if (sys.includes('playstation') || sys.includes('ps2') || sys.includes('ps1')) {
+                badgeText.textContent = "Mando DualShock PlayStation 2";
+                container.innerHTML = `
+                    <div class="grid grid-cols-3 gap-2 w-36 h-36 p-2 bg-slate-950/40 rounded-full backdrop-blur-sm border border-slate-800 items-center justify-center">
+                        <div></div>
+                        <button ontouchstart="keyMap['KeyZ']=true" ontouchend="delete keyMap['KeyZ']" class="w-10 h-10 rounded-full ps-btn-triangle action-btn font-bold text-sm shadow-lg active:scale-90 flex items-center justify-center">▲</button>
+                        <div></div>
+                        <button ontouchstart="keyMap['KeyZ']=true" ontouchend="delete keyMap['KeyZ']" class="w-10 h-10 rounded-full ps-btn-square action-btn font-bold text-sm shadow-lg active:scale-90 flex items-center justify-center">◼</button>
+                        <div></div>
+                        <button ontouchstart="keyMap['KeyX']=true" ontouchend="delete keyMap['KeyX']" class="w-10 h-10 rounded-full ps-btn-circle action-btn font-bold text-sm shadow-lg active:scale-90 flex items-center justify-center">●</button>
+                        <div></div>
+                        <button ontouchstart="keyMap['KeyX']=true" ontouchend="delete keyMap['KeyX']" class="w-10 h-10 rounded-full ps-btn-cross action-btn font-bold text-sm shadow-lg active:scale-90 flex items-center justify-center">✖</button>
+                        <div></div>
+                    </div>
+                `;
+            } else if (sys.includes('wii')) {
+                badgeText.textContent = "Mando Wiimote / Classic Controller Wii";
+                container.innerHTML = `
+                    <div class="flex flex-col gap-2 items-center bg-slate-900/80 p-3 rounded-2xl border border-slate-700 backdrop-blur-md shadow-2xl">
+                        <div class="flex gap-2">
+                            <button ontouchstart="keyMap['KeyZ']=true" ontouchend="delete keyMap['KeyZ']" class="w-12 h-12 rounded-full wii-btn shadow-md text-base active:scale-90 flex items-center justify-center">A</button>
+                            <button ontouchstart="keyMap['KeyX']=true" ontouchend="delete keyMap['KeyX']" class="w-10 h-10 rounded-full bg-slate-700 text-white font-bold active:scale-90 flex items-center justify-center">B</button>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="w-7 h-7 rounded-full bg-slate-800 text-slate-300 font-bold text-xs">-</button>
+                            <button class="w-7 h-7 rounded-full bg-slate-800 text-slate-300 font-bold text-xs">+</button>
+                            <button class="w-7 h-7 rounded-full bg-blue-500 text-white font-bold text-xs">1</button>
+                            <button class="w-7 h-7 rounded-full bg-blue-500 text-white font-bold text-xs">2</button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Classic Nintendo (GBA / SNES / NES / N64)
+                badgeText.textContent = "Mando Retro Nintendo / Universal";
+                container.innerHTML = `
+                    <div class="flex gap-3 bg-slate-950/40 p-3 rounded-full border border-slate-800 backdrop-blur-sm">
+                        <button ontouchstart="keyMap['KeyX']=true" ontouchend="delete keyMap['KeyX']" class="w-12 h-12 rounded-full bg-red-600 text-white font-bold text-lg action-btn active:scale-90 flex items-center justify-center shadow-lg">B</button>
+                        <button ontouchstart="keyMap['KeyZ']=true" ontouchend="delete keyMap['KeyZ']" class="w-12 h-12 rounded-full bg-amber-500 text-white font-bold text-lg action-btn active:scale-90 flex items-center justify-center shadow-lg">A</button>
+                    </div>
+                `;
+            }
+        }
+
+        function toggleFullscreen() {
+            const elem = document.getElementById('game-container') || document.documentElement;
+            if (!document.fullscreenElement) {
+                elem.requestFullscreen?.().catch(err => console.log(err));
+            } else {
+                document.exitFullscreen?.();
+            }
+        }
+
+        function launchGameObj(game) {
+            currentGame = game;
+            isPlaying = true;
+
+            document.getElementById('idle-screen').classList.add('hidden');
+            updateControllerLayout(game.systemName);
+            toggleFullscreen();
+
+            // Run simple game canvas loop
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameLoop() {
+            if(!isPlaying) return;
+
+            // Physics / Input update
+            if (keyMap['ArrowLeft']) player.x -= 4;
+            if (keyMap['ArrowRight']) player.x += 4;
+            if ((keyMap['KeyZ'] || keyMap['ArrowUp']) && player.grounded) {
+                player.vy = -12;
+                player.grounded = false;
+            }
+
+            player.vy += 0.6;
+            player.y += player.vy;
+
+            if (player.y >= 380) {
+                player.y = 380;
+                player.vy = 0;
+                player.grounded = true;
+            }
+
+            // Clear Screen
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Ground
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 412, canvas.width, 68);
+
+            // Coins
+            coins.forEach(coin => {
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath();
+                ctx.arc(coin.x, coin.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Player Sprite
+            ctx.fillStyle = currentGame ? currentGame.color : '#6366f1';
+            ctx.fillRect(player.x, player.y, 32, 32);
+
+            // Overlay Info
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '14px sans-serif';
+            ctx.fillText(`Juego: ${currentGame ? currentGame.title : 'Emulando'} (${currentGame ? currentGame.systemName : 'ROM'})`, 20, 30);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function renderGamesGrid() {
+            const grid = document.getElementById('games-grid');
+            if(!grid) return;
+
+            const allGames = [...userLoadedGames, ...sampleGames];
+            grid.innerHTML = allGames.map(game => `
+                <div onclick='launchGameObj(${JSON.stringify(game)})' class="cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col items-center justify-between gap-3 hover:border-indigo-500 hover:scale-105 transition shadow-lg group">
+                    <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl shadow-md group-hover:rotate-6 transition" style="background-color: ${game.color}">
+                        <i class="fa-solid ${game.icon || 'fa-compact-disc'}"></i>
+                    </div>
+                    <div class="text-center w-full">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-400 block">${game.systemName}</span>
+                        <h4 class="text-xs font-bold text-white truncate w-full" title="${game.title}">${game.title}</h4>
+                    </div>
+                    <button class="w-full bg-slate-800 hover:bg-indigo-600 text-white text-[10px] font-bold py-1.5 rounded-lg transition">JUGAR</button>
+                </div>
+            `).join('');
+        }
+
+        function setupFileInputs() {
+            ['top-rom-input', 'main-rom-input'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('change', (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+
+                        const ext = file.name.split('.').pop().toLowerCase();
+                        let sys = 'PS2';
+                        if (['gba'].includes(ext)) sys = 'GBA';
+                        else if (['wbfs'].includes(ext)) sys = 'Wii';
+                        else if (['smc', 'sfc'].includes(ext)) sys = 'SNES';
+                        else if (['z64', 'n64'].includes(ext)) sys = 'N64';
+
+                        const newGame = {
+                            id: 'local-' + Date.now(),
+                            title: file.name.replace(/\.[^/.]+$/, ""),
+                            systemName: sys,
+                            color: '#6366f1',
+                            icon: 'fa-compact-disc'
+                        };
+
+                        userLoadedGames.unshift(newGame);
+                        renderGamesGrid();
+                        launchGameObj(newGame);
+                    });
+                }
+            });
+        }
+
+        // Global Keyboard Listeners
+        window.addEventListener('keydown', (e) => { keyMap[e.code] = true; });
+        window.addEventListener('keyup', (e) => { delete keyMap[e.code]; });
+
+        // On Load Init
+        window.onload = function() {
+            renderGamesGrid();
+            setupFileInputs();
+            updateControllerLayout('PS2');
+        };
+    </script>
+</body>
+</html>
